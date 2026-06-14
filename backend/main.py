@@ -10,6 +10,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import uvicorn
 
 app = FastAPI()
 app.add_middleware(
@@ -227,3 +228,7 @@ def get_posts():
 @app.get("/")
 def root():
     return {"message": "Zen Post App API is running"}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
