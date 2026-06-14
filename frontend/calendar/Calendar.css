@@ -1,0 +1,139 @@
+.calendar-picker {
+  background: #242831;
+  border: 1px solid #30343d;
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 320px;
+}
+
+.calendar-header h3 {
+  margin: 0 0 16px 0;
+  color: #f9fafb;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.calendar-grid {
+  margin-bottom: 16px;
+}
+
+.calendar-grid .fc {
+  background: #111318;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.calendar-grid .fc-toolbar {
+  margin-bottom: 12px;
+}
+
+.calendar-grid .fc-toolbar-title {
+  color: #f9fafb;
+  font-size: 1rem;
+}
+
+.calendar-grid .fc-button {
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+}
+
+.calendar-grid .fc-button:hover {
+  background: #1d4ed8;
+}
+
+.calendar-grid .fc-daygrid-day {
+  cursor: pointer;
+}
+
+.calendar-grid .fc-daygrid-day:hover {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.calendar-grid .fc-day-selected {
+  background: #2563eb !important;
+  color: white;
+}
+
+.time-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #111318;
+  border-radius: 10px;
+}
+
+.time-label {
+  color: #cbd5e1;
+  font-weight: 600;
+  min-width: 50px;
+}
+
+.time-dropdowns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-dropdown {
+  padding: 8px 12px;
+  background: #1a1d23;
+  border: 1px solid #3a404b;
+  border-radius: 8px;
+  color: #f9fafb;
+  font-size: 1rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.time-dropdown:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.calendar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-btn,
+.apply-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.cancel-btn {
+  background: #6b7280;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #5a626e;
+}
+
+.apply-btn {
+  background: #2563eb;
+  color: white;
+}
+
+.apply-btn:hover {
+  background: #1d4ed8;
+}
+
+.selected-date-display {
+  padding: 10px 12px;
+  background: #1a1d23;
+  border-radius: 8px;
+  color: #93c5fd;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  text-align: center;
+}
