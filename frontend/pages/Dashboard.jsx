@@ -368,7 +368,7 @@ export default function Dashboard() {
       <div className="form-section">
         <h2>Select Thumbnail</h2>
         {thumbnails.length > 0 ? (
-          <div className="thumbnail-grid">
+          <div className="thumbnail-scroll">
             {thumbnails.map((thumbnailUrl) => (
               <button
                 key={thumbnailUrl}
