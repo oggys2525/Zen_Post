@@ -4,6 +4,7 @@ import VideoPlayer from '../components/VideoPlayer.jsx';
 import Calendar from '../calendar/Calendar.jsx';
 
 export default function Dashboard() {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://zen-post-1.onrender.com";
   const [videoUrl, setVideoUrl] = useState('');
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
@@ -71,7 +72,7 @@ export default function Dashboard() {
   };
 
   const extractVideoFromUrl = async (url) => {
-    const response = await fetch('http://localhost:8000/extract-video', {
+    const response = await fetch(`${API_BASE_URL}/extract-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
@@ -201,7 +202,7 @@ export default function Dashboard() {
       formData.append('caption', caption);
       formData.append('scheduled_time', getScheduledTime());
 
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: formData,
       });
