@@ -18,17 +18,23 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://zen-post.vercel.app",
+        "https://zen-post-1.onrender.com",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    if response.headers.get("content-type", "").startswith(("image/", "video/", "application/octet-stream")):
-        response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=30")
     return response
 
 BASE_DIR = os.path.dirname(__file__)
