@@ -446,14 +446,14 @@ h1 {
 
   .thumbnail-scroll {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
     padding: 2px 0;
   }
 
   .thumbnail-button {
     flex: 0 0 auto;
-    width: 90px;
+    width: 80px;
     background: none;
     border: 2px solid #30343d;
     border-radius: 6px;
@@ -474,8 +474,8 @@ h1 {
   }
 
   .thumbnail-image {
-    width: 90px;
-    height: 50px;
+    width: 80px;
+    height: 45px;
     object-fit: cover;
     display: block;
     background: #0b0c10;
