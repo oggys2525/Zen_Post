@@ -491,4 +491,98 @@ h1 {
     font-size: 0.8rem;
     margin: 8px 0 0 0;
   }
+
+  .photo-selector {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .photo-preview {
+    width: 200px;
+    height: 200px;
+    background: #d1d5db;
+    border: 2px solid #30343d;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .photo-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .photo-clear {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .photo-clear:hover {
+    background: rgba(239, 68, 68, 0.9);
+  }
+
+  .photo-selector-placeholder {
+    color: #6b7280;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 12px;
+  }
+
+  .photo-add {
+    width: 200px;
+    height: 200px;
+    background: #d1d5db;
+    border: 2px dashed #9ca3af;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .photo-add-label {
+    width: 64px;
+    height: 64px;
+    background: #e5e7eb;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    user-select: none;
+  }
+
+  .photo-add-label:hover {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .photo-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
 }

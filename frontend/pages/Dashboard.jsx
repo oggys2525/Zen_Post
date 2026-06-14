@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [extractError, setExtractError] = useState('');
   const [thumbnails, setThumbnails] = useState([]);
   const [selectedThumbnail, setSelectedThumbnail] = useState('');
+  const [coverPhoto, setCoverPhoto] = useState('');
   const autoPreviewTimer = useRef(null);
 
   const getEmbedUrl = (url) => {
@@ -144,6 +145,21 @@ export default function Dashboard() {
 
   const handleSelectThumbnail = (thumbnailUrl) => {
     setSelectedThumbnail(thumbnailUrl);
+  };
+
+  const handleCoverPhotoChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPhoto(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleClearCoverPhoto = () => {
+    setCoverPhoto('');
   };
 
   const handleUrlChange = (e) => {
@@ -386,6 +402,41 @@ export default function Dashboard() {
         {extractError && (
           <p className="thumbnail-error">ERROR: Cannot read image. Please try again or contact support.</p>
         )}
+      </div>
+
+      <div className="form-section">
+        <h2>Cover Photo</h2>
+        <div className="photo-selector">
+          <div className="photo-preview">
+            {coverPhoto ? (
+              <>
+                <img src={coverPhoto} alt="Cover preview" className="photo-preview-image" />
+                <button
+                  type="button"
+                  onClick={handleClearCoverPhoto}
+                  className="photo-clear"
+                  aria-label="Clear cover photo"
+                >
+                  ✕
+                </button>
+              </>
+            ) : (
+              <span className="photo-selector-placeholder">Click for choose photo</span>
+            )}
+          </div>
+          <div className="photo-add">
+            <label htmlFor="cover-upload" className="photo-add-label">
+              +
+            </label>
+            <input
+              id="cover-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleCoverPhotoChange}
+              className="photo-input"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="form-section">
