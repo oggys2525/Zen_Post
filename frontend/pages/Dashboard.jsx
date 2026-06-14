@@ -369,14 +369,14 @@ export default function Dashboard() {
         <h2>Select Thumbnail</h2>
         {thumbnails.length > 0 ? (
           <div className="thumbnail-scroll">
-            {thumbnails.map((thumbnailUrl) => (
+            {thumbnails.map((thumbnailUrl, index) => (
               <button
                 key={thumbnailUrl}
                 type="button"
                 onClick={() => handleSelectThumbnail(thumbnailUrl)}
                 className={`thumbnail-button${selectedThumbnail === thumbnailUrl ? ' thumbnail-button--selected' : ''}`}
               >
-                <img src={thumbnailUrl} alt={`Frame ${thumbnailUrl}`} className="thumbnail-image" />
+                <img src={thumbnailUrl} alt={`Frame ${index + 1}`} className="thumbnail-image" />
               </button>
             ))}
           </div>

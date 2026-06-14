@@ -445,15 +445,14 @@ h1 {
   }
 
   .thumbnail-scroll {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 80px);
     gap: 6px;
-    padding: 2px 0;
+    overflow-x: auto;
   }
 
   .thumbnail-button {
-    flex: 0 0 auto;
-    width: 80px;
+    aspect-ratio: 1;
     background: none;
     border: 2px solid #30343d;
     border-radius: 6px;
@@ -474,8 +473,8 @@ h1 {
   }
 
   .thumbnail-image {
-    width: 80px;
-    height: 45px;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     display: block;
     background: #0b0c10;
