@@ -443,4 +443,44 @@ h1 {
   .time-inputs {
     justify-content: flex-start;
   }
+
+  .thumbnail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .thumbnail-button {
+    background: none;
+    border: 2px solid #30343d;
+    border-radius: 12px;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .thumbnail-button:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+  }
+
+  .thumbnail-button--selected {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+  }
+
+  .thumbnail-image {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+    background: #0b0c10;
+  }
+
+  .thumbnail-placeholder {
+    color: #9ca3af;
+    font-size: 0.95rem;
+    margin: 0;
+  }
 }

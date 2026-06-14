@@ -7,12 +7,14 @@ from typing import Optional
 from urllib.parse import quote, urlparse
 import glob
 import hashlib
+import json
 import os
 import shutil
 import subprocess
 import uvicorn
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,14 +25,20 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(__file__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+THUMBNAIL_DIR = os.path.join(BASE_DIR, "thumbnails")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(THUMBNAIL_DIR, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.mount("/downloads", StaticFiles(directory=DOWNLOAD_DIR), name="downloads")
+app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 
 class VideoExtractRequest(BaseModel):
     url: str
+
+class FilePathRequest(BaseModel):
+    file_path: str
 
 class PostSchedule(BaseModel):
     video_url: Optional[str] = ""
@@ -99,6 +107,51 @@ def transcode_audio_to_aac(file_path):
     subprocess.run(command, check=True)
     os.replace(temp_path, file_path)
 
+def generate_video_thumbnails(video_path, count=4):
+    try:
+        import imageio_ffmpeg
+        import cv2
+    except ImportError:
+        raise RuntimeError("opencv-python is required for thumbnail generation. Run: pip install opencv-python")
+
+    if not os.path.isfile(video_path):
+        raise RuntimeError("Video file was not found for thumbnail generation.")
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError("Could not open video for thumbnail generation.")
+
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0
+    duration = frame_count / fps if fps > 0 else 0
+
+    if duration <= 0:
+        cap.release()
+        raise RuntimeError("Could not determine video duration.")
+
+    interval = duration / (count + 1)
+    thumbnail_paths = []
+    video_id = safe_video_id(video_path)
+
+    for index in range(1, count + 1):
+        timestamp = interval * index
+        cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
+        success, frame = cap.read()
+        if not success:
+            continue
+
+        thumbnail_filename = f"{video_id}_thumb_{index}.jpg"
+        thumbnail_path = os.path.join(THUMBNAIL_DIR, thumbnail_filename)
+        cv2.imwrite(thumbnail_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        thumbnail_paths.append(thumbnail_filename)
+
+    cap.release()
+
+    if not thumbnail_paths:
+        raise RuntimeError("Could not generate thumbnails from video.")
+
+    return thumbnail_paths
+
 def download_video_file(url, directory, output_template):
     try:
         import yt_dlp
@@ -153,6 +206,12 @@ async def extract_video(body: VideoExtractRequest, request: Request):
         description = (info.get("description") or "").strip()
         caption = description or (info.get("title") or "")
 
+        try:
+            thumbnail_filenames = generate_video_thumbnails(file_path)
+            thumbnail_urls = [f"{str(request.base_url).rstrip('/')}/thumbnails/{quote(name)}" for name in thumbnail_filenames]
+        except Exception:
+            thumbnail_urls = []
+
         return {
             "success": True,
             "video_url": build_public_url(request, filename),
@@ -161,6 +220,7 @@ async def extract_video(body: VideoExtractRequest, request: Request):
             "duration": info.get("duration"),
             "platform": info.get("extractor_key"),
             "caption": caption[:2000],
+            "thumbnails": thumbnail_urls,
         }
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -205,7 +265,14 @@ async def upload_video(
         "created_at": datetime.now().isoformat(),
     }
     POST_DB.append(post_data)
-    return {"message": "Video uploaded successfully", "data": post_data}
+
+    try:
+        thumbnail_filenames = generate_video_thumbnails(video_path)
+        thumbnail_urls = [f"/thumbnails/{quote(name)}" for name in thumbnail_filenames]
+    except Exception:
+        thumbnail_urls = []
+
+    return {"message": "Video uploaded successfully", "data": post_data, "thumbnails": thumbnail_urls}
 
 @app.post("/schedule")
 def schedule_post(post: PostSchedule):

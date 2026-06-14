@@ -20,6 +20,8 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
+  const [thumbnails, setThumbnails] = useState([]);
+  const [selectedThumbnail, setSelectedThumbnail] = useState('');
   const autoPreviewTimer = useRef(null);
 
   const getEmbedUrl = (url) => {
@@ -101,6 +103,8 @@ export default function Dashboard() {
 
       setVideoPreviewUrl(extractedData.video_url);
       setVideoFile(null);
+      setThumbnails(extractedData.thumbnails || []);
+      setSelectedThumbnail(extractedData.thumbnail || (extractedData.thumbnails?.[0]) || '');
       setIsLoaded(true);
 
       if (!caption.trim()) {
@@ -130,9 +134,16 @@ export default function Dashboard() {
     setVideoPreviewUrl('');
     setVideoFile(null);
     setCaption('');
+    setThumbnails([]);
+    setSelectedThumbnail('');
     setIsLoaded(false);
     setIsExtracting(false);
     setExtractError('');
+    autoPreviewTimer.current = null;
+  };
+
+  const handleSelectThumbnail = (thumbnailUrl) => {
+    setSelectedThumbnail(thumbnailUrl);
   };
 
   const handleUrlChange = (e) => {
@@ -202,6 +213,7 @@ export default function Dashboard() {
       formData.append('page', facebookPage);
       formData.append('caption', caption);
       formData.append('scheduled_time', getScheduledTime());
+      formData.append('thumbnail', selectedThumbnail);
 
       const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
@@ -351,6 +363,26 @@ export default function Dashboard() {
           rows="4"
           placeholder="Write your caption here..."
         />
+      </div>
+
+      <div className="form-section">
+        <h2>Select Thumbnail</h2>
+        {thumbnails.length > 0 ? (
+          <div className="thumbnail-grid">
+            {thumbnails.map((thumbnailUrl) => (
+              <button
+                key={thumbnailUrl}
+                type="button"
+                onClick={() => handleSelectThumbnail(thumbnailUrl)}
+                className={`thumbnail-button${selectedThumbnail === thumbnailUrl ? ' thumbnail-button--selected' : ''}`}
+              >
+                <img src={thumbnailUrl} alt={`Frame ${thumbnailUrl}`} className="thumbnail-image" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="thumbnail-placeholder">Load a preview to select a thumbnail.</p>
+        )}
       </div>
 
       <div className="form-section">
