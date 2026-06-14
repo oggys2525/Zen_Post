@@ -383,6 +383,9 @@ export default function Dashboard() {
         ) : (
           <p className="thumbnail-placeholder">Load a preview to select a thumbnail.</p>
         )}
+        {extractError && (
+          <p className="thumbnail-error">ERROR: Cannot read image. Please try again or contact support.</p>
+        )}
       </div>
 
       <div className="form-section">
