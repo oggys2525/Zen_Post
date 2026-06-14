@@ -22,7 +22,6 @@ export default function Dashboard() {
   const [extractError, setExtractError] = useState('');
   const [thumbnails, setThumbnails] = useState([]);
   const [selectedThumbnail, setSelectedThumbnail] = useState('');
-  const [coverPhoto, setCoverPhoto] = useState('');
   const autoPreviewTimer = useRef(null);
 
   const getEmbedUrl = (url) => {
@@ -258,6 +257,13 @@ export default function Dashboard() {
     return `${scheduledDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   };
 
+  const scheduledTimeLabel = (() => {
+    const value = getScheduledTime();
+    if (!value) return 'Schedule your post';
+    const d = new Date(value);
+    return `Posting on ${d.toLocaleDateString()} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  })();
+
   const isFutureDateTime = (dateTimeStr) => {
     const selected = new Date(dateTimeStr);
     const now = new Date();
@@ -404,39 +410,28 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="form-section">
-        <h2>Cover Photo</h2>
-        <div className="photo-selector">
-          <div className="photo-preview">
-            {coverPhoto ? (
-              <>
-                <img src={coverPhoto} alt="Cover preview" className="photo-preview-image" />
-                <button
-                  type="button"
-                  onClick={handleClearCoverPhoto}
-                  className="photo-clear"
-                  aria-label="Clear cover photo"
-                >
-                  ✕
-                </button>
-              </>
-            ) : (
-              <span className="photo-selector-placeholder">Click for choose photo</span>
-            )}
+      <div className="form-section post-layout">
+        <div className="post-header">
+          <div className="post-avatar">
+            {facebookPage ? facebookPage.charAt(0).toUpperCase() : 'P'}
           </div>
-          <div className="photo-add">
-            <label htmlFor="cover-upload" className="photo-add-label">
-              +
-            </label>
-            <input
-              id="cover-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleCoverPhotoChange}
-              className="photo-input"
-            />
+          <div className="post-meta">
+            <div className="post-page-name">{facebookPage || 'Page Name'}</div>
+            <div className="post-time">{scheduledTimeLabel}</div>
           </div>
         </div>
+        <div className="post-media">
+          {videoPreviewUrl && !isEmbed ? (
+            <video src={videoPreviewUrl} controls className="post-video" />
+          ) : videoPreviewUrl ? (
+            <img src={videoPreviewUrl} alt="Post preview" className="post-image" />
+          ) : (
+            <div className="post-media-placeholder">No media selected</div>
+          )}
+        </div>
+        <button type="button" onClick={handleUploadNow} className="post-share-btn" disabled={isLoading}>
+          {isLoading ? 'Posting...' : 'Support Page Follow & Share'}
+        </button>
       </div>
 
       <div className="form-section">
