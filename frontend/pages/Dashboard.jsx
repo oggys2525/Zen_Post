@@ -388,8 +388,9 @@ export default function Dashboard() {
       <div className="form-section">
         <h2>Schedule Post</h2>
         <div className="input-group">
-          <label>Date:</label>
+          <label htmlFor="scheduled-date">Date:</label>
           <input
+            id="scheduled-date"
             type="date"
             value={scheduledDate}
             onChange={(e) => setScheduledDate(e.target.value)}
@@ -408,6 +409,7 @@ export default function Dashboard() {
               onChange={(e) => setScheduledHour(e.target.value)}
               className="hour-input"
               placeholder="HH"
+              aria-label="Hour"
             />
             <span className="time-separator">:</span>
             <input
@@ -418,6 +420,7 @@ export default function Dashboard() {
               onChange={(e) => setScheduledMinute(e.target.value)}
               className="minute-input"
               placeholder="MM"
+              aria-label="Minute"
             />
           </div>
         </div>
