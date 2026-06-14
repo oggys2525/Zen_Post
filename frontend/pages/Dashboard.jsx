@@ -129,6 +129,7 @@ export default function Dashboard() {
     setVideoUrl('');
     setVideoPreviewUrl('');
     setVideoFile(null);
+    setCaption('');
     setIsLoaded(false);
     setIsExtracting(false);
     setExtractError('');
