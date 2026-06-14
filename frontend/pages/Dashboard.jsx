@@ -257,13 +257,6 @@ export default function Dashboard() {
     return `${scheduledDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   };
 
-  const scheduledTimeLabel = (() => {
-    const value = getScheduledTime();
-    if (!value) return 'Schedule your post';
-    const d = new Date(value);
-    return `Posting on ${d.toLocaleDateString()} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  })();
-
   const isFutureDateTime = (dateTimeStr) => {
     const selected = new Date(dateTimeStr);
     const now = new Date();
@@ -408,30 +401,6 @@ export default function Dashboard() {
         {extractError && (
           <p className="thumbnail-error">ERROR: Cannot read image. Please try again or contact support.</p>
         )}
-      </div>
-
-      <div className="form-section post-layout">
-        <div className="post-header">
-          <div className="post-avatar">
-            {facebookPage ? facebookPage.charAt(0).toUpperCase() : 'P'}
-          </div>
-          <div className="post-meta">
-            <div className="post-page-name">{facebookPage || 'Page Name'}</div>
-            <div className="post-time">{scheduledTimeLabel}</div>
-          </div>
-        </div>
-        <div className="post-media">
-          {videoPreviewUrl && !isEmbed ? (
-            <video src={videoPreviewUrl} controls className="post-video" />
-          ) : videoPreviewUrl ? (
-            <img src={videoPreviewUrl} alt="Post preview" className="post-image" />
-          ) : (
-            <div className="post-media-placeholder">No media selected</div>
-          )}
-        </div>
-        <button type="button" onClick={handleUploadNow} className="post-share-btn" disabled={isLoading}>
-          {isLoading ? 'Posting...' : 'Support Page Follow & Share'}
-        </button>
       </div>
 
       <div className="form-section">
