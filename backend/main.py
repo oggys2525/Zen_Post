@@ -29,6 +29,20 @@ app.add_middleware(
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=30")
+    return response
+
+@app.options("/{full_path:path}")
+async def preflight_handler(request: Request, full_path: str):
+    from fastapi.responses import JSONResponse
+    response = JSONResponse(content={}, status_code=200)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=30")
     return response
 
