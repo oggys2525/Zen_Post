@@ -63,7 +63,7 @@
 .facebook-preview-media-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(300px, calc((100% - 10px) / 2));
+  grid-auto-columns: minmax(0, calc((100% - 10px) / 2));
   gap: 10px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
@@ -88,8 +88,10 @@
 .facebook-preview-video-box,
 .facebook-preview-add-card {
   position: relative;
-  min-height: 350px;
-  min-width: 300px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
   border-radius: 14px;
   background: #202126;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -119,7 +121,6 @@
 .facebook-preview-video {
   width: 100%;
   height: 100%;
-  max-height: 350px;
   object-fit: cover;
   display: block;
   background: #000;
@@ -176,13 +177,24 @@
 
 @media (max-width: 520px) {
    .facebook-preview-card {
-     padding: 20px;
+     padding: 16px;
+   }
+
+   .facebook-preview-media-grid {
+     grid-template-columns: 1fr;
+     grid-auto-flow: row;
+     grid-auto-columns: 1fr;
+     gap: 12px;
+     overflow-x: visible;
+     scroll-snap-type: none;
    }
 
    .facebook-preview-video-box,
    .facebook-preview-add-card {
-     min-height: 250px;
-     min-width: 250px;
+     width: 100%;
+     min-height: 0;
+     min-width: 0;
+     aspect-ratio: 1 / 1;
      scroll-snap-align: start;
    }
 }
