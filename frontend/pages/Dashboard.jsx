@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './Dashboard.css';
 import VideoPlayer from '../components/VideoPlayer.jsx';
 import Calendar from '../calendar/Calendar.jsx';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [facebookAccount, setFacebookAccount] = useState('');
   const [facebookPage, setFacebookPage] = useState('');
   const [caption, setCaption] = useState('');
+  const [captionSource, setCaptionSource] = useState('manual');
   const [ctaAction, setCtaAction] = useState('');
   const [recentCtaActions, setRecentCtaActions] = useState(() => {
     const saved = localStorage.getItem('recentCtaActions');
@@ -30,6 +31,20 @@ export default function Dashboard() {
   const [thumbnails, setThumbnails] = useState([]);
   const [selectedThumbnail, setSelectedThumbnail] = useState('');
   const autoPreviewTimer = useRef(null);
+  const fileInputRef = useRef(null);
+  const thumbnailRequestId = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (autoPreviewTimer.current) {
+        clearTimeout(autoPreviewTimer.current);
+      }
+
+      if (videoPreviewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(videoPreviewUrl);
+      }
+    };
+  }, []);
 
   const getEmbedUrl = (url) => {
     try {
@@ -80,6 +95,100 @@ export default function Dashboard() {
     return text && text !== 'N/A' ? text : '';
   };
 
+  const normalizeVideoUrl = (value) => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+    return trimmed;
+  };
+
+  const isValidHttpUrl = (value) => /^https?:\/\//i.test(value || '');
+
+  const isVideoFile = (file) => Boolean(file && (file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|3gp|mkv|avi)$/i.test(file.name)));
+
+  const captionFromUrl = (url) => {
+    try {
+      const parsed = new URL(url);
+      const fileName = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() || parsed.hostname);
+      const title = fileName.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ');
+      return cleanCaption(title || parsed.hostname);
+    } catch (e) {
+      return cleanCaption(url);
+    }
+  };
+
+  const captionFromFile = (file) => cleanCaption((file?.name || '').replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' '));
+
+  const generateLocalThumbnails = (videoUrl, count = 4) => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const thumbnails = [];
+
+      const cleanup = () => {
+        video.removeAttribute('src');
+        video.load();
+      };
+
+      const finish = () => {
+        cleanup();
+        resolve(thumbnails);
+      };
+
+      if (!context) {
+        finish();
+        return;
+      }
+
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = videoUrl;
+
+      video.onloadedmetadata = () => {
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+        const width = video.videoWidth || 320;
+        const height = video.videoHeight || 180;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        if (duration <= 0.1) {
+          context.drawImage(video, 0, 0, width, height);
+          thumbnails.push(canvas.toDataURL('image/jpeg', 0.82));
+          finish();
+          return;
+        }
+
+        const captureAt = (index) => {
+          const time = (duration * (index + 1)) / (count + 1);
+          video.currentTime = Math.min(time, Math.max(duration - 0.05, 0));
+        };
+
+        const captureNext = (index) => {
+          if (index >= count) {
+            finish();
+            return;
+          }
+
+          video.onseeked = () => {
+            context.drawImage(video, 0, 0, width, height);
+            thumbnails.push(canvas.toDataURL('image/jpeg', 0.82));
+            captureNext(index + 1);
+          };
+
+          captureAt(index);
+        };
+
+        captureNext(0);
+      };
+
+      video.onerror = finish;
+    });
+  };
+
   const extractVideoFromUrl = async (url) => {
     const response = await fetch(`${API_BASE_URL}/extract-video`, {
       method: 'POST',
@@ -108,27 +217,39 @@ export default function Dashboard() {
         URL.revokeObjectURL(videoPreviewUrl);
       }
 
+      thumbnailRequestId.current += 1;
+
       setVideoPreviewUrl(extractedData.video_url);
       setVideoFile(null);
       setThumbnails(extractedData.thumbnails || []);
       setSelectedThumbnail(extractedData.thumbnail || (extractedData.thumbnails?.[0]) || '');
       setIsLoaded(true);
 
-      if (!caption.trim()) {
-        setCaption(cleanCaption(extractedData.caption));
+      const extractedCaption = cleanCaption(extractedData.caption || extractedData.title || captionFromUrl(url));
+      if (!caption.trim() || captionSource !== 'manual') {
+        setCaption(extractedCaption);
+        setCaptionSource('auto');
       }
     } catch (error) {
       setVideoPreviewUrl(url);
       setVideoFile(null);
       setIsLoaded(true);
       setExtractError(error.message);
+
+      const fallbackCaption = captionFromUrl(url);
+      if (!caption.trim() || captionSource !== 'manual') {
+        setCaption(fallbackCaption);
+        setCaptionSource('auto');
+      }
     } finally {
       setIsExtracting(false);
     }
   };
 
   const handleLoadVideo = async () => {
-    const url = videoUrl.trim();
+    const url = normalizeVideoUrl(videoUrl);
+    setVideoUrl(url);
+    thumbnailRequestId.current += 1;
     await loadVideoFromUrl(url);
   };
 
@@ -141,12 +262,18 @@ export default function Dashboard() {
     setVideoPreviewUrl('');
     setVideoFile(null);
     setCaption('');
+    setCaptionSource('manual');
     setThumbnails([]);
     setSelectedThumbnail('');
     setIsLoaded(false);
     setIsExtracting(false);
     setExtractError('');
+    thumbnailRequestId.current += 1;
     autoPreviewTimer.current = null;
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSelectThumbnail = (thumbnailUrl) => {
@@ -169,15 +296,16 @@ export default function Dashboard() {
   };
 
   const handleUrlChange = (e) => {
-    const value = e.target.value.trim();
+    const value = normalizeVideoUrl(e.target.value);
     setVideoUrl(value);
     setExtractError('');
+    thumbnailRequestId.current += 1;
 
     if (autoPreviewTimer.current) {
       clearTimeout(autoPreviewTimer.current);
     }
 
-    if (value.startsWith('http://') || value.startsWith('https://')) {
+    if (isValidHttpUrl(value)) {
       autoPreviewTimer.current = setTimeout(() => {
         loadVideoFromUrl(value);
       }, 500);
@@ -190,20 +318,40 @@ export default function Dashboard() {
     setIsExtracting(false);
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
 
-    if (file && file.type.startsWith('video/')) {
+    if (isVideoFile(file)) {
       if (videoPreviewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(videoPreviewUrl);
       }
 
+      thumbnailRequestId.current += 1;
+      const requestId = thumbnailRequestId.current;
+      const objectUrl = URL.createObjectURL(file);
+
       setVideoFile(file);
-      setVideoPreviewUrl(URL.createObjectURL(file));
+      setVideoPreviewUrl(objectUrl);
       setVideoUrl('');
+      setThumbnails([]);
+      setSelectedThumbnail('');
       setIsLoaded(true);
       setIsExtracting(false);
       setExtractError('');
+
+      const fileCaption = captionFromFile(file);
+      if (!caption.trim() || captionSource !== 'manual') {
+        setCaption(fileCaption);
+        setCaptionSource('auto');
+      }
+
+      const generatedThumbnails = await generateLocalThumbnails(objectUrl);
+      if (thumbnailRequestId.current !== requestId) {
+        return;
+      }
+
+      setThumbnails(generatedThumbnails);
+      setSelectedThumbnail(generatedThumbnails[0] || '');
     }
   };
 
@@ -364,11 +512,20 @@ export default function Dashboard() {
           id="video-upload"
           type="file"
           accept="video/*"
+          ref={fileInputRef}
           onChange={handleFileChange}
           hidden
         />
 
-        {videoFile && <p className="file-name">{videoFile.name}</p>}
+        {videoUrl && isValidHttpUrl(videoUrl) ? (
+          <p className="file-name">
+            <a href={videoUrl} target="_blank" rel="noreferrer">
+              {videoUrl}
+            </a>
+          </p>
+        ) : (
+          videoFile && <p className="file-name">{videoFile.name}</p>
+        )}
       </div>
 
       <div className="preview-section">
@@ -380,7 +537,10 @@ export default function Dashboard() {
         <h2>Caption</h2>
         <textarea
           value={caption}
-          onChange={(e) => setCaption(e.target.value)}
+          onChange={(e) => {
+            setCaption(e.target.value);
+            setCaptionSource('manual');
+          }}
           className="caption-input"
           rows="4"
           placeholder="Write your caption here..."
