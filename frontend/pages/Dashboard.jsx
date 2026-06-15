@@ -15,10 +15,10 @@ export default function Dashboard() {
   const [facebookPage, setFacebookPage] = useState('');
   const [caption, setCaption] = useState('');
   const [ctaAction, setCtaAction] = useState('');
-   const [recentCtaActions, setRecentCtaActions] = useState(() => {
-     const saved = localStorage.getItem('recentCtaActions');
-     return saved ? JSON.parse(saved) : [];
-   });
+  const [recentCtaActions, setRecentCtaActions] = useState(() => {
+    const saved = localStorage.getItem('recentCtaActions');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledHour, setScheduledHour] = useState('');
   const [scheduledMinute, setScheduledMinute] = useState('');
@@ -385,7 +385,7 @@ export default function Dashboard() {
           rows="4"
           placeholder="Write your caption here..."
         />
-</div>
+      </div>
 
       <CTABox
         value={ctaAction}
@@ -435,7 +435,7 @@ export default function Dashboard() {
         {extractError && (
           <p className="thumbnail-error">ERROR: Cannot read image. Please try again or contact support.</p>
         )}
-</div>
+      </div>
 
       <FacebookPreview
         pageName={facebookPage || 'Page Name'}

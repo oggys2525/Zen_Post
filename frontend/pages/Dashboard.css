@@ -211,12 +211,7 @@ h1 {
   color: #60a5fa;
 }
 
-.time-inputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+.time-inputs,
 .time-dropdowns {
   display: flex;
   align-items: center;
@@ -541,10 +536,10 @@ h1 {
     width: 100%;
   }
 
-.time-inputs,
-.time-dropdowns {
-  justify-content: flex-start;
-}
+  .time-inputs,
+  .time-dropdowns {
+    justify-content: flex-start;
+  }
 
   .thumbnail-scroll {
     display: grid;
