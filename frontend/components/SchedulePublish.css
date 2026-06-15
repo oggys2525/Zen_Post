@@ -1,0 +1,87 @@
+.schedule-publish-card {
+  min-width: 340px;
+  background: #242831 !important;
+  border: 1px solid #30343d !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.schedule-publish-content {
+  padding: 20px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.schedule-publish-title {
+  margin: 0;
+  color: #f9fafb;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.datetime-picker {
+  width: 100%;
+}
+
+.datetime-picker .MuiInputBase-root {
+  background: #111318;
+  border-radius: 8px;
+}
+
+.datetime-picker .MuiInputBase-input {
+  color: #f9fafb;
+  padding: 12px 14px;
+}
+
+.datetime-picker .MuiFormLabel-root {
+  color: #9ca3af;
+}
+
+.datetime-picker .MuiOutlinedInput-notchedOutline {
+  border-color: #3a404b;
+}
+
+.datetime-picker .MuiOutlinedInput-notchedOutline.Mui-focused {
+  border-color: #3b82f6;
+}
+
+.default-switch {
+  margin: 0;
+  align-self: flex-start;
+}
+
+.default-switch .MuiFormControlLabel-label {
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.default-switch .MuiSwitch-switchBase {
+  color: #3b82f6;
+}
+
+.default-switch .Mui-checked {
+  color: #3b82f6;
+}
+
+.schedule-publish-actions {
+  padding: 16px 20px !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-btn {
+  color: #9ca3af !important;
+}
+
+.apply-btn {
+  background: #2563eb !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+.apply-btn:hover {
+  background: #1d4ed8 !important;
+}
