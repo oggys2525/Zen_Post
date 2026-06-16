@@ -1,2 +1,2 @@
 # Zen_Post
-Test tool Support develop to post with Facebook Page
+Post scheduler for social media publishing

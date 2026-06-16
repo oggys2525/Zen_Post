@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import './Dashboard.css';
+import './PEPost.css';
 import VideoPlayer from '../components/VideoPlayer.jsx';
-import Calendar from '../calendar/Calendar.jsx';
+import DateTimePicker from '../calendar/Calendar.jsx';
 import CTABox from '../components/CTABox.jsx';
 import FacebookPreview from '../components/FacebookPreview.jsx';
 
-export default function Dashboard() {
+export default function PEPost() {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://zen-post-1.onrender.com";
   const [videoUrl, setVideoUrl] = useState('');
   const [videoFile, setVideoFile] = useState(null);
@@ -20,11 +20,13 @@ export default function Dashboard() {
     const saved = localStorage.getItem('recentCtaActions');
     return saved ? JSON.parse(saved) : [];
   });
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledHour, setScheduledHour] = useState('');
-  const [scheduledMinute, setScheduledMinute] = useState('');
+
+  const now = new Date();
+  const [scheduledDate, setScheduledDate] = useState(() => now.toISOString().split('T')[0]);
+  const [scheduledHour, setScheduledHour] = useState(() => String(now.getHours()).padStart(2, '0'));
+  const [scheduledMinute, setScheduledMinute] = useState(() => String(now.getMinutes()).padStart(2, '0'));
   const [showCalendar, setShowCalendar] = useState(false);
-  const todayStr = new Date().toISOString().split('T')[0];
+
   const [isLoading, setIsLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
@@ -45,6 +47,21 @@ export default function Dashboard() {
       }
     };
   }, []);
+
+  const formatScheduledDateTime = () => {
+    if (!scheduledDate) return 'Select date and time';
+    const hour24 = parseInt(scheduledHour, 10) || 0;
+    const minute = parseInt(scheduledMinute, 10) || 0;
+    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 || 12;
+    const dateObj = new Date(`${scheduledDate}T${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+    const formattedDate = dateObj.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    return `${formattedDate}, ${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${ampm}`;
+  };
 
   const getEmbedUrl = (url) => {
     try {
@@ -280,21 +297,6 @@ export default function Dashboard() {
     setSelectedThumbnail(thumbnailUrl);
   };
 
-  const handleCoverPhotoChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCoverPhoto(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleClearCoverPhoto = () => {
-    setCoverPhoto('');
-  };
-
   const handleUrlChange = (e) => {
     const value = normalizeVideoUrl(e.target.value);
     setVideoUrl(value);
@@ -457,11 +459,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>Facebook Post Scheduler</h1>
-      </header>
-
-      <div className="form-section">
+      <div className="form-section" id="pe-post">
         <h2>Facebook Account & Page</h2>
         <div className="input-group">
           <label>Account:</label>
@@ -560,7 +558,7 @@ export default function Dashboard() {
           const updated = [...new Set([action, ...recentCtaActions].slice(0, 10))];
           setRecentCtaActions(updated);
           localStorage.setItem('recentCtaActions', JSON.stringify(updated));
-          
+
           alert(`Added CTA: ${action}`);
         }}
       />
@@ -607,55 +605,17 @@ export default function Dashboard() {
 
       <div className="form-section">
         <h2>Schedule Post</h2>
-        <div className="input-group">
-          <label htmlFor="scheduled-date">Date:</label>
-          <input
-            id="scheduled-date"
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            min={todayStr}
-            className="date-input"
-          />
-        </div>
-        <div className="input-group">
-          <label>Time:</label>
-          <div className="time-dropdowns">
-            <select
-              value={scheduledHour}
-              onChange={(e) => setScheduledHour(e.target.value)}
-              className="time-dropdown"
-              aria-label="Hour"
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={String(i).padStart(2, '0')}>
-                  {String(i).padStart(2, '0')}
-                </option>
-              ))}
-            </select>
-            <span className="time-separator">:</span>
-            <select
-              value={scheduledMinute}
-              onChange={(e) => setScheduledMinute(e.target.value)}
-              className="time-dropdown"
-              aria-label="Minute"
-            >
-              {Array.from({ length: 60 }, (_, i) => (
-                <option key={i} value={String(i).padStart(2, '0')}>
-                  {String(i).padStart(2, '0')}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="button-group">
+        <div className="schedule-line">
+          <span className="schedule-display">{formatScheduledDateTime()}</span>
           <button
             type="button"
-            onClick={() => setShowCalendar(true)}
             className="calendar-trigger-btn"
+            onClick={() => setShowCalendar(true)}
           >
             Pick Date & Time
           </button>
+        </div>
+        <div className="button-group">
           <button
             type="button"
             onClick={handleUploadNow}
@@ -667,8 +627,9 @@ export default function Dashboard() {
         </div>
         {showCalendar && (
           <div className="calendar-modal">
-            <Calendar
-              onApply={(dateTime) => {
+            <DateTimePicker
+              value={`${scheduledDate}T${scheduledHour}:${scheduledMinute}`}
+              onChange={(dateTime) => {
                 const [date, time] = dateTime.split('T');
                 const [hour, minute] = time.split(':');
                 setScheduledDate(date);
