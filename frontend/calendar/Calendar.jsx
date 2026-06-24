@@ -69,6 +69,11 @@ export default function DateTimePicker({ value, onChange, onCancel }) {
 
   return (
     <div className="dtp-picker" ref={pickerRef}>
+      <div className="dtp-picker-header">
+        <h3>Pick publish time</h3>
+        <p>Choose a future date and time for your post.</p>
+      </div>
+
       <div className="dtp-picker-row">
         <label className="dtp-label">Date:</label>
         <input

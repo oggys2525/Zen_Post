@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Header from './components/Header.jsx';
 import PEPost from './pages/PEPost.jsx';
 import Home from './pages/Home.jsx';
+import Downloader from './pages/Downloader.jsx';
+import PowerEditor from './pages/PowerEditor.jsx';
 import './App.css';
 
 export default function App() {
@@ -15,10 +17,17 @@ export default function App() {
   return (
     <div className="app-shell">
       <Header activePage={page} onNavigate={navigateTo} />
-      {page === 'home' ? (
-        <Home onOpenPost={() => navigateTo('pe-post')} />
-      ) : (
+      {page === 'home' && (
+        <Home onOpenPost={() => navigateTo('pe-post')} onOpenPowerEditor={() => navigateTo('power-editor')} onOpenDownloader={() => navigateTo('downloader')} />
+      )}
+      {page === 'downloader' && (
+        <Downloader onOpenPost={() => navigateTo('pe-post')} />
+      )}
+      {page === 'pe-post' && (
         <PEPost />
+      )}
+      {page === 'power-editor' && (
+        <PowerEditor />
       )}
     </div>
   );

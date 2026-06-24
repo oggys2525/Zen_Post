@@ -19,7 +19,7 @@ const features = [
   },
 ];
 
-export default function Home({ onOpenPost }) {
+export default function Home({ onOpenPost, onOpenPowerEditor, onOpenDownloader }) {
   return (
     <main className="home-page">
       <section className="home-hero">
@@ -27,18 +27,17 @@ export default function Home({ onOpenPost }) {
           <span className="home-eyebrow">Zen Post App</span>
           <h1>Plan, preview, and publish posts with confidence.</h1>
           <p>
-            Build your PE post, add a caption, choose a thumbnail, and schedule publishing from one focused workspace.
+            Build your post, add a caption, choose a thumbnail, verify Facebook account connection, and schedule publishing from one focused workspace.
           </p>
           <div className="home-hero-actions">
             <button type="button" className="home-primary-btn" onClick={onOpenPost}>
               Create PE Post
             </button>
-            <button
-              type="button"
-              className="home-secondary-btn"
-              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              See features
+            <button type="button" className="home-primary-btn" style={{ background: 'var(--success-color)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }} onClick={onOpenPowerEditor}>
+              Power Editor
+            </button>
+            <button type="button" className="home-secondary-btn" onClick={onOpenDownloader}>
+              Downloader Hub
             </button>
           </div>
         </div>

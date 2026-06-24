@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './Header.css';
 
 const STORAGE_KEYS = [
   'userEmail',
@@ -49,34 +50,44 @@ const readStoredEmail = () => {
 };
 
 const menuItems = [
-  {
-    label: 'Home',
-    id: 'home',
-  },
-  {
-    label: 'PE Post',
-    id: 'pe-post',
-  },
+  { id: 'home', label: 'Home' },
+  { id: 'downloader', label: 'Downloader' },
+  { id: 'pe-post', label: 'PE Post Builder' },
+  { id: 'power-editor', label: 'Power Editor Dashboard' },
 ];
 
 const notificationList = [
   {
     id: 1,
-    title: 'Profile connected',
-    message: 'Your stored email is shown in the header.',
+    title: 'Workspace ready',
+    message: 'Your post builder, preview, and schedule tools are connected.',
   },
   {
     id: 2,
-    title: 'Ready to schedule',
-    message: 'Add your social media accounts and publish posts when ready.',
+    title: 'Publish with confidence',
+    message: 'Review captions, thumbnails, and timing before posting.',
   },
 ];
+
+const BellIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+    <path d="M10 21h4" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
 
 export default function Header({ activePage = 'home', onNavigate }) {
   const [email, setEmail] = useState(readStoredEmail);
   const [notifications, setNotifications] = useState(notificationList);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [navBlur, setNavBlur] = useState(false);
 
   const handleSignOut = () => {
     STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
@@ -90,12 +101,9 @@ export default function Header({ activePage = 'home', onNavigate }) {
 
   useEffect(() => {
     const refreshEmail = () => setEmail(readStoredEmail());
-
     refreshEmail();
     window.addEventListener('storage', refreshEmail);
-
     const intervalId = setInterval(refreshEmail, 1000);
-
     return () => {
       window.removeEventListener('storage', refreshEmail);
       clearInterval(intervalId);
@@ -103,8 +111,19 @@ export default function Header({ activePage = 'home', onNavigate }) {
   }, []);
 
   useEffect(() => {
+    const handleScroll = () => {
+      setNavBlur(window.scrollY > 20);
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
     const closeDropdowns = (event) => {
-      if (!event.target.closest('.header-actions')) {
+      if (!event.target.closest('.header-wrapper')) {
         setShowNotifications(false);
         setShowProfile(false);
       }
@@ -133,132 +152,148 @@ export default function Header({ activePage = 'home', onNavigate }) {
   const unreadCount = notifications.length;
 
   return (
-    <header className="dashboard-header">
-      <div className="dashboard-header-row">
-        <div className="dashboard-header-title">
-          <h1>Zen Post</h1>
-          <p>Plan, preview, and publish with confidence</p>
-        </div>
+    <>
+      <header className={`header-wrapper${navBlur ? ' header-wrapper--blur' : ''}`}>
+      <div className="header-container">
+        {/* Brand Section */}
+        <button
+          type="button"
+          className="header-brand"
+          aria-label="Go to Home"
+          onClick={() => handleMenuClick('home')}
+        >
+          <div className="brand-logo">ZP</div>
+          <div className="brand-text">
+            <h1>Zen Post</h1>
+          </div>
+        </button>
 
+        {/* Actions Section */}
         <div className="header-actions">
-          <div className="notification-wrap">
+          {/* Create Button */}
+          <button
+            type="button"
+            className="action-btn action-btn--primary"
+            title="Create new post"
+            onClick={() => handleMenuClick('pe-post')}
+          >
+            <PlusIcon />
+            <span className="action-label">Create</span>
+          </button>
+
+          {/* Notifications */}
+          <div className="action-dropdown">
             <button
               type="button"
-              className="header-icon-button notification-button"
-              aria-label="Show notifications"
+              className="action-btn"
+              aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}`}
               aria-expanded={showNotifications}
+              aria-haspopup="true"
               onClick={() => {
-                setShowNotifications((open) => !open);
+                setShowNotifications(!showNotifications);
                 setShowProfile(false);
               }}
             >
-              <svg className="header-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M10 21h4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <BellIcon />
               {unreadCount > 0 && (
-                <span className="notification-badge">{unreadCount}</span>
+                <span className="badge">{unreadCount}</span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="notification-dropdown" role="menu">
-                <div className="notification-dropdown-header">
+              <div className="dropdown-menu notification-dropdown" role="menu">
+                <div className="dropdown-header">
                   <strong>Notifications</strong>
                   <button
                     type="button"
-                    className="notification-clear-btn"
+                    className="btn-text"
                     onClick={() => setNotifications([])}
                   >
-                    Mark all read
+                    Clear
                   </button>
                 </div>
 
-                {notifications.length > 0 ? (
-                  <div className="notification-list">
-                    {notifications.map((notification) => (
+                <div className="dropdown-body">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification) => (
                       <div key={notification.id} className="notification-item">
-                        <span className="notification-dot" />
-                        <div>
+                        <div className="notification-dot" />
+                        <div className="notification-content">
                           <strong>{notification.title}</strong>
-                          <span>{notification.message}</span>
+                          <p>{notification.message}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="notification-empty">No new notifications</div>
-                )}
+                    ))
+                  ) : (
+                    <div className="empty-state">All caught up</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          <div className="profile-wrap">
+          {/* Profile */}
+          <div className="action-dropdown">
             <button
               type="button"
-              className="profile-pill"
-              aria-label="Show profile menu"
+              className="action-btn action-btn--profile"
+              aria-label="Account menu"
               aria-expanded={showProfile}
+              aria-haspopup="true"
               onClick={() => {
-                setShowProfile((open) => !open);
+                setShowProfile(!showProfile);
                 setShowNotifications(false);
               }}
             >
               <div className="profile-avatar">{initials}</div>
-              <div className="profile-info">
-                <span className="profile-label">Profile</span>
-                <span className="profile-email">{email || 'Not signed in'}</span>
-              </div>
             </button>
 
             {showProfile && (
-              <div className="profile-dropdown" role="menu" aria-label="Profile menu">
-                <div className="profile-dropdown-header">
-                  <div className="profile-dropdown-avatar">{initials}</div>
-                  <div>
+              <div className="dropdown-menu profile-dropdown" role="menu">
+                <div className="dropdown-header">
+                  <div className="profile-avatar">{initials}</div>
+                  <div className="profile-info">
                     <strong>Profile</strong>
-                    <span>{email || 'Not signed in'}</span>
+                    <span className="profile-email">{email || 'Not signed in'}</span>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="profile-dropdown-action profile-dropdown-action--danger"
-                  onClick={handleSignOut}
-                >
-                  Sign out
-                </button>
+                <div className="dropdown-body">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => handleMenuClick('pe-post')}
+                  >
+                    Open PE Post
+                  </button>
+                  <button
+                    type="button"
+                    className="dropdown-item dropdown-item--danger"
+                    onClick={handleSignOut}
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      <nav className="header-menu" aria-label="Primary menu">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`header-menu-item${activePage === item.id ? ' header-menu-item--active' : ''}`}
-            onClick={() => handleMenuClick(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+      <nav className={`navbar${navBlur ? ' navbar--blur' : ''}`} aria-label="Primary navigation">
+        <div className="navbar-container">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`navbar-item ${activePage === item.id ? 'navbar-item--active' : ''}`}
+              onClick={() => handleMenuClick(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </nav>
     </header>
+    </>
   );
 }

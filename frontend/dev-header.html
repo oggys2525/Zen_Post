@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dev Header Preview</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#0f1720;color:#e5e7eb;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;}
+    .dashboard-header{margin:16px;border:1px solid rgba(148,163,184,0.12);border-radius:28px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent),rgba(15,18,25,0.92);padding:12px;}
+    .dashboard-header-inner{display:grid;grid-template-columns:1fr;gap:8px}
+    .dashboard-header-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .dashboard-brand{display:flex;align-items:center;gap:12px;background:transparent;border:none;color:inherit;cursor:pointer}
+    .brand-mark{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff}
+    .brand-copy h1{margin:0;font-size:1.25rem;color:#f9fafb}
+    .brand-copy p{margin:2px 0 0;color:#94a3b8;font-size:0.88rem}
+    .header-actions{display:flex;align-items:center;gap:8px}
+    .header-create-btn{border:none;cursor:pointer;padding:10px 14px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:800;display:flex;align-items:center;gap:8px}
+    .header-create-btn svg{width:18px;height:18px}
+    .header-icon-button{width:44px;height:44px;border-radius:12px;border:1px solid rgba(148,163,184,0.12);background:rgba(17,24,39,0.8);display:inline-flex;align-items:center;justify-content:center;color:#cbd5e1;cursor:pointer}
+    .notification-badge{position:relative;left:-6px;top:-12px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:0.7rem;border:2px solid #0f1720}
+    .profile-pill{display:flex;align-items:center;gap:8px;border-radius:12px;background:rgba(17,24,39,0.8);padding:6px 8px;color:#fff;border:1px solid rgba(148,163,184,0.06);cursor:pointer}
+    .profile-avatar{width:36px;height:36px;border-radius:999px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:900}
+    .profile-info{display:flex;flex-direction:column}
+    .profile-label{font-size:0.68rem;color:#94a3b8;font-weight:700;text-transform:uppercase}
+    .profile-email{font-size:0.88rem;color:#f9fafb;font-weight:800}
+    @media (max-width:620px){
+      .brand-mark{width:42px;height:42px}
+      .brand-copy p{display:none}
+      .header-create-btn span{display:none}
+      .profile-info{display:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-header">
+    <div class="dashboard-header-inner">
+      <div class="dashboard-header-top">
+        <button type="button" class="dashboard-brand" aria-label="Go to Home">
+          <span class="brand-mark">ZP</span>
+          <span class="brand-copy"><h1>Zen Post</h1><p>Plan, preview, and publish with confidence</p></span>
+        </button>
+
+        <div class="header-actions">
+          <button type="button" class="header-create-btn" title="Create Post">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            <span>Create Post</span>
+          </button>
+
+          <div class="notification-wrap">
+            <button type="button" class="header-icon-button notification-button" aria-label="Show notifications: 2 unread" aria-expanded="false" aria-haspopup="menu">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg>
+              <span class="notification-badge">2</span>
+            </button>
+          </div>
+
+          <div class="profile-wrap">
+            <button type="button" class="profile-pill" aria-label="Show profile menu" aria-expanded="false" aria-haspopup="menu">
+              <div class="profile-avatar">U</div>
+              <div class="profile-info"><span class="profile-label">Profile</span><span class="profile-email">Not signed in</span></div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.notification-button, .profile-pill, .dashboard-brand, .header-create-btn').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const expanded = el.getAttribute('aria-expanded') === 'true';
+        if(el.hasAttribute('aria-expanded')) el.setAttribute('aria-expanded', (!expanded).toString());
+      });
+    });
+  </script>
+</body>
+</html>

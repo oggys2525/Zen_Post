@@ -61,6 +61,11 @@ app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails"
 class VideoExtractRequest(BaseModel):
     url: str
 
+class MediaDownloadRequest(BaseModel):
+    url: str
+    format: str # 'mp3' or 'mp4'
+    save_folder: Optional[str] = ""
+
 class FilePathRequest(BaseModel):
     file_path: str
 
@@ -104,30 +109,63 @@ def clear_existing_downloads(output_template):
         if os.path.isfile(path):
             os.remove(path)
 
+def is_audio_aac(file_path):
+    try:
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        result = subprocess.run(
+            [ffmpeg_exe, "-i", file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5
+        )
+        info = result.stderr or result.stdout
+        return "Audio: aac" in info
+    except Exception:
+        return False
+
 def transcode_audio_to_aac(file_path):
     import imageio_ffmpeg
 
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     temp_path = f"{file_path}.aac.mp4"
-    command = [
-        ffmpeg_exe,
-        "-y",
-        "-i",
-        file_path,
-        "-map",
-        "0:v?",
-        "-map",
-        "0:a?",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
-        "-movflags",
-        "+faststart",
-        temp_path,
-    ]
+    
+    if is_audio_aac(file_path):
+        # Already AAC. Just copy streams and add faststart (instant)
+        command = [
+            ffmpeg_exe,
+            "-y",
+            "-i",
+            file_path,
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            temp_path,
+        ]
+    else:
+        # Not AAC. Transcode audio to AAC
+        command = [
+            ffmpeg_exe,
+            "-y",
+            "-i",
+            file_path,
+            "-map",
+            "0:v?",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
+            temp_path,
+        ]
+        
     subprocess.run(command, check=True)
     os.replace(temp_path, file_path)
 
@@ -176,7 +214,7 @@ def generate_video_thumbnails(video_path, count=4):
 
     return thumbnail_paths
 
-def download_video_file(url, directory, output_template):
+def download_video_file(url, directory, output_template, progress_hook=None):
     try:
         import yt_dlp
     except ImportError as error:
@@ -191,7 +229,7 @@ def download_video_file(url, directory, output_template):
     clear_existing_downloads(output_template)
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4][vcodec!=vp9][vcodec!=av01]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best[ext=mp4]/best",
+        "format": "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "postprocessor_args": {
             "ffmpeg": ["-c:a", "aac"],
@@ -203,10 +241,14 @@ def download_video_file(url, directory, output_template):
         "socket_timeout": 30,
         "retries": 3,
         "fragment_retries": 3,
+        "concurrent_fragment_downloads": 8,
     }
 
     if ffmpeg_location:
         ydl_opts["ffmpeg_location"] = ffmpeg_location
+
+    if progress_hook:
+        ydl_opts["progress_hooks"] = [progress_hook]
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -253,6 +295,181 @@ async def extract_video(body: VideoExtractRequest, request: Request):
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"Could not extract video: {error}") from error
 
+import uuid
+import threading
+import time
+import requests
+
+DB_POSTS_FILE = os.path.join(BASE_DIR, "posts_db.json")
+DB_FB_FILE = os.path.join(BASE_DIR, "fb_config.json")
+
+def load_posts():
+    if not os.path.exists(DB_POSTS_FILE):
+        return []
+    try:
+        with open(DB_POSTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_posts(posts):
+    try:
+        with open(DB_POSTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(posts, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print("Error saving posts:", e)
+
+def load_fb_config():
+    if not os.path.exists(DB_FB_FILE):
+        return {"user_access_token": "", "user_name": "", "user_id": "", "pages": []}
+    try:
+        with open(DB_FB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"user_access_token": "", "user_name": "", "user_id": "", "pages": []}
+
+def save_fb_config(config):
+    try:
+        with open(DB_FB_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print("Error saving FB config:", e)
+
+def publish_post_async(post_id: str):
+    posts = load_posts()
+    post_index = next((i for i, p in enumerate(posts) if p.get("id") == post_id), -1)
+    if post_index == -1:
+        return
+        
+    post = posts[post_index]
+    fb_config = load_fb_config()
+    page_id = post.get("fb_page_id")
+    page_name = post.get("fb_page_name") or "Selected Page"
+    
+    # Find page access token
+    pages = fb_config.get("pages") or []
+    page_access_token = None
+    for p in pages:
+        if str(p.get("id")) == str(page_id):
+            page_access_token = p.get("access_token")
+            break
+            
+    if not page_access_token:
+        # Fallback to general user access token if page access token is not separate
+        page_access_token = fb_config.get("user_access_token")
+        
+    if not page_access_token:
+        post["status"] = "failed"
+        post["error_message"] = "No Facebook Access Token found. Please connect Facebook account."
+        post["published_at"] = datetime.now().isoformat()
+        save_posts(posts)
+        return
+        
+    video_path = post.get("video_path")
+    
+    # Download video if not already present but video_url is
+    if (not video_path or not os.path.exists(video_path)) and post.get("video_url"):
+        try:
+            url = validate_http_url(post.get("video_url"))
+            video_id = safe_video_id(url)
+            output_template = os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s")
+            _, file_path = download_video_file(url, DOWNLOAD_DIR, output_template)
+            video_path = file_path
+            post["video_path"] = video_path
+            save_posts(posts)
+        except Exception as dl_err:
+            post["status"] = "failed"
+            post["error_message"] = f"Download failed: {dl_err}"
+            post["published_at"] = datetime.now().isoformat()
+            save_posts(posts)
+            return
+
+    if not video_path or not os.path.exists(video_path):
+        post["status"] = "failed"
+        post["error_message"] = f"Video file not found at {video_path}"
+        post["published_at"] = datetime.now().isoformat()
+        save_posts(posts)
+        return
+        
+    # Start actual Facebook video upload
+    try:
+        url = f"https://graph.facebook.com/v20.0/{page_id}/videos"
+        payload = {
+            'access_token': page_access_token,
+            'description': post.get("caption") or ""
+        }
+        
+        with open(video_path, 'rb') as f:
+            files = {
+                'source': f
+            }
+            response = requests.post(url, data=payload, files=files, timeout=600)
+            
+        result = response.json()
+        if response.status_code != 200 or 'error' in result:
+            error_details = result.get('error', {})
+            error_msg = error_details.get('message', 'Unknown Facebook API error')
+            raise Exception(f"Facebook Graph API Error: {error_msg} (code: {error_details.get('code')})")
+            
+        fb_post_id = result.get('id') or result.get('post_id')
+        
+        post["status"] = "published"
+        post["fb_post_id"] = fb_post_id
+        post["error_message"] = ""
+        post["published_at"] = datetime.now().isoformat()
+        print(f"Post {post_id} published successfully to page {page_name}!")
+    except Exception as ex:
+        post["status"] = "failed"
+        post["error_message"] = str(ex)
+        post["published_at"] = datetime.now().isoformat()
+        print(f"Post {post_id} failed to publish: {ex}")
+        
+    save_posts(posts)
+
+def background_scheduler():
+    while True:
+        try:
+            posts = load_posts()
+            for post in posts:
+                if post.get("status") == "scheduled":
+                    sched_time_str = post.get("scheduled_time")
+                    if sched_time_str:
+                        try:
+                            # Scheduled time is formatted as YYYY-MM-DDTHH:MM
+                            sched_time = datetime.fromisoformat(sched_time_str)
+                            if datetime.now() >= sched_time:
+                                post["status"] = "processing"
+                                save_posts(posts)
+                                
+                                # Run publish async so we don't block
+                                pub_thread = threading.Thread(target=publish_post_async, args=(post.get("id"),))
+                                pub_thread.daemon = True
+                                pub_thread.start()
+                        except Exception as parse_err:
+                            post["status"] = "failed"
+                            post["error_message"] = f"Invalid scheduled time format: {parse_err}"
+                            save_posts(posts)
+        except Exception as err:
+            print("Error in background scheduler:", err)
+        time.sleep(10)
+
+# Start scheduler thread
+scheduler_thread = threading.Thread(target=background_scheduler)
+scheduler_thread.daemon = True
+scheduler_thread.start()
+
+class ConnectRequest(BaseModel):
+    accessToken: str
+
+class CreatePostRequest(BaseModel):
+    video_url: Optional[str] = ""
+    video_path: Optional[str] = ""
+    caption: str
+    fb_page_id: str
+    fb_page_name: str
+    scheduled_time: Optional[str] = ""
+    thumbnail_url: Optional[str] = ""
+
 @app.post("/upload")
 async def upload_video(
     video: Optional[UploadFile] = File(None),
@@ -260,6 +477,8 @@ async def upload_video(
     account: str = Form(...),
     page: str = Form(...),
     caption: str = Form(...),
+    scheduled_time: Optional[str] = Form(None),
+    thumbnail: Optional[str] = Form(None),
 ):
     video_path = None
 
@@ -279,16 +498,41 @@ async def upload_video(
         except Exception as error:
             raise HTTPException(status_code=400, detail=f"Could not download video from URL: {error}") from error
 
+    post_id = str(uuid.uuid4())[:8]
+    status = "scheduled" if scheduled_time else "processing"
+
+    # Try mapping page to names if possible
+    fb_config = load_fb_config()
+    page_name = page
+    for p in fb_config.get("pages", []):
+        if str(p.get("id")) == str(page):
+            page_name = p.get("name")
+            break
+
     post_data = {
-        "video_path": video_path,
+        "id": post_id,
+        "video_path": video_path or "",
         "video_url": video_url or "",
-        "account": account,
-        "page": page,
         "caption": caption,
-        "status": "uploaded",
+        "fb_page_id": page,
+        "fb_page_name": page_name,
+        "scheduled_time": scheduled_time or "",
+        "thumbnail_url": thumbnail or "",
+        "status": status,
+        "error_message": "",
+        "fb_post_id": "",
         "created_at": datetime.now().isoformat(),
+        "published_at": "",
     }
-    POST_DB.append(post_data)
+    
+    posts = load_posts()
+    posts.append(post_data)
+    save_posts(posts)
+
+    if status == "processing":
+        pub_thread = threading.Thread(target=publish_post_async, args=(post_id,))
+        pub_thread.daemon = True
+        pub_thread.start()
 
     try:
         thumbnail_filenames = generate_video_thumbnails(video_path)
@@ -296,25 +540,501 @@ async def upload_video(
     except Exception:
         thumbnail_urls = []
 
-    return {"message": "Video uploaded successfully", "data": post_data, "thumbnails": thumbnail_urls}
+    return {"message": "Video processed successfully", "data": post_data, "thumbnails": thumbnail_urls}
 
 @app.post("/schedule")
 def schedule_post(post: PostSchedule):
+    post_id = str(uuid.uuid4())[:8]
+    status = "scheduled" if post.scheduled_time else "processing"
+    
+    fb_config = load_fb_config()
+    page_name = post.page
+    for p in fb_config.get("pages", []):
+        if str(p.get("id")) == str(post.page):
+            page_name = p.get("name")
+            break
+
     post_data = {
+        "id": post_id,
+        "video_path": "",
         "video_url": post.video_url or "",
-        "account": post.account,
-        "page": post.page,
         "caption": post.caption,
-        "scheduled_time": post.scheduled_time,
-        "status": "scheduled",
+        "fb_page_id": post.page,
+        "fb_page_name": page_name,
+        "scheduled_time": post.scheduled_time or "",
+        "thumbnail_url": "",
+        "status": status,
+        "error_message": "",
+        "fb_post_id": "",
         "created_at": datetime.now().isoformat(),
+        "published_at": "",
     }
-    POST_DB.append(post_data)
+    
+    posts = load_posts()
+    posts.append(post_data)
+    save_posts(posts)
+
+    if status == "processing":
+        pub_thread = threading.Thread(target=publish_post_async, args=(post_id,))
+        pub_thread.daemon = True
+        pub_thread.start()
+
     return {"message": "Post scheduled successfully", "data": post_data}
 
 @app.get("/posts")
 def get_posts():
-    return POST_DB
+    return load_posts()
+
+@app.post("/api/posts")
+def create_post(body: CreatePostRequest):
+    posts = load_posts()
+    status = "scheduled" if body.scheduled_time else "processing"
+    post_id = str(uuid.uuid4())[:8]
+    
+    new_post = {
+        "id": post_id,
+        "video_url": body.video_url or "",
+        "video_path": body.video_path or "",
+        "caption": body.caption,
+        "fb_page_id": body.fb_page_id,
+        "fb_page_name": body.fb_page_name,
+        "scheduled_time": body.scheduled_time or "",
+        "thumbnail_url": body.thumbnail_url or "",
+        "status": status,
+        "error_message": "",
+        "fb_post_id": "",
+        "created_at": datetime.now().isoformat(),
+        "published_at": ""
+    }
+    
+    posts.append(new_post)
+    save_posts(posts)
+    
+    if status == "processing":
+        pub_thread = threading.Thread(target=publish_post_async, args=(post_id,))
+        pub_thread.daemon = True
+        pub_thread.start()
+        
+    return {"success": True, "post": new_post}
+
+@app.put("/api/posts/{post_id}")
+def update_post(post_id: str, body: CreatePostRequest):
+    posts = load_posts()
+    post_index = next((i for i, p in enumerate(posts) if p.get("id") == post_id), -1)
+    if post_index == -1:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    post = posts[post_index]
+    post["caption"] = body.caption
+    post["fb_page_id"] = body.fb_page_id
+    post["fb_page_name"] = body.fb_page_name
+    post["scheduled_time"] = body.scheduled_time or ""
+    post["thumbnail_url"] = body.thumbnail_url or ""
+    
+    if post["status"] in ("draft", "scheduled", "failed"):
+        if body.scheduled_time:
+            post["status"] = "scheduled"
+        else:
+            post["status"] = "draft"
+            
+    save_posts(posts)
+    return {"success": True, "post": post}
+
+@app.delete("/api/posts/{post_id}")
+def delete_post(post_id: str):
+    posts = load_posts()
+    post_index = next((i for i, p in enumerate(posts) if p.get("id") == post_id), -1)
+    if post_index == -1:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    post = posts.pop(post_index)
+    if post.get("video_path") and os.path.exists(post.get("video_path")):
+        try:
+            if "downloads" in post.get("video_path") or "uploads" in post.get("video_path"):
+                os.remove(post.get("video_path"))
+        except Exception:
+            pass
+            
+    save_posts(posts)
+    return {"success": True}
+
+@app.post("/api/posts/{post_id}/publish")
+def publish_post_now(post_id: str):
+    posts = load_posts()
+    post_index = next((i for i, p in enumerate(posts) if p.get("id") == post_id), -1)
+    if post_index == -1:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    post = posts[post_index]
+    post["status"] = "processing"
+    save_posts(posts)
+    
+    pub_thread = threading.Thread(target=publish_post_async, args=(post_id,))
+    pub_thread.daemon = True
+    pub_thread.start()
+    
+    return {"success": True, "message": "Publishing started"}
+
+@app.post("/api/posts/bulk-publish")
+def bulk_publish_posts(body: dict):
+    post_ids = body.get("post_ids", [])
+    posts = load_posts()
+    
+    count = 0
+    for post_id in post_ids:
+        post_index = next((i for i, p in enumerate(posts) if p.get("id") == post_id), -1)
+        if post_index != -1:
+            post = posts[post_index]
+            if post.get("status") in ("draft", "scheduled", "failed", "uploaded"):
+                post["status"] = "processing"
+                count += 1
+                pub_thread = threading.Thread(target=publish_post_async, args=(post_id,))
+                pub_thread.daemon = True
+                pub_thread.start()
+                
+    if count > 0:
+        save_posts(posts)
+        
+    return {"success": True, "message": f"Started bulk publishing {count} posts"}
+
+@app.post("/api/posts/bulk-delete")
+def bulk_delete_posts(body: dict):
+    post_ids = body.get("post_ids", [])
+    posts = load_posts()
+    
+    new_posts = []
+    for post in posts:
+        if post.get("id") in post_ids:
+            video_path = post.get("video_path")
+            if video_path and os.path.exists(video_path):
+                try:
+                    os.remove(video_path)
+                except Exception:
+                    pass
+        else:
+            new_posts.append(post)
+            
+    save_posts(new_posts)
+    return {"success": True, "message": f"Deleted {len(posts) - len(new_posts)} posts"}
+
+@app.get("/api/fb/status")
+def get_facebook_status():
+    config = load_fb_config()
+    return {
+        "connected": bool(config.get("user_access_token")),
+        "user_name": config.get("user_name"),
+        "user_id": config.get("user_id"),
+        "pages": [
+            {
+                "id": p.get("id"),
+                "name": p.get("name"),
+                "category": p.get("category"),
+                "picture": p.get("picture", {}).get("data", {}).get("url") if isinstance(p.get("picture"), dict) else None
+            }
+            for p in config.get("pages", [])
+        ]
+    }
+
+@app.post("/api/fb/connect")
+def connect_facebook(body: ConnectRequest):
+    token = body.accessToken.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token cannot be empty")
+        
+    try:
+        profile_res = requests.get(
+            f"https://graph.facebook.com/v20.0/me?fields=id,name,picture&access_token={token}",
+            timeout=15
+        )
+        profile_data = profile_res.json()
+        if "error" in profile_data:
+            raise Exception(profile_data["error"]["message"])
+            
+        user_name = profile_data.get("name", "Unknown User")
+        user_id = profile_data.get("id", "")
+        
+        pages_res = requests.get(
+            f"https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,category,picture&access_token={token}",
+            timeout=15
+        )
+        pages_data = pages_res.json()
+        if "error" in pages_data:
+            pages_list = []
+        else:
+            pages_list = pages_data.get("data", [])
+            
+        config = {
+            "user_access_token": token,
+            "user_name": user_name,
+            "user_id": user_id,
+            "pages": pages_list
+        }
+        save_fb_config(config)
+        
+        return {
+            "success": True,
+            "user_name": user_name,
+            "user_id": user_id,
+            "pages": [
+                {
+                    "id": p.get("id"),
+                    "name": p.get("name"),
+                    "category": p.get("category"),
+                    "picture": p.get("picture", {}).get("data", {}).get("url") if isinstance(p.get("picture"), dict) else None
+                }
+                for p in pages_list
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect: {e}")
+
+@app.post("/api/fb/disconnect")
+def disconnect_facebook():
+    config = {"user_access_token": "", "user_name": "", "user_id": "", "pages": []}
+    save_fb_config(config)
+    return {"success": True}
+
+DB_DOWNLOADS_FILE = os.path.join(BASE_DIR, "downloads_db.json")
+
+def load_downloads():
+    if not os.path.exists(DB_DOWNLOADS_FILE):
+        return []
+    try:
+        with open(DB_DOWNLOADS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_downloads(downloads):
+    try:
+        with open(DB_DOWNLOADS_FILE, "w", encoding="utf-8") as f:
+            json.dump(downloads, f, indent=4)
+    except Exception:
+        pass
+
+def download_audio_file(url, directory, output_template, progress_hook=None):
+    try:
+        import yt_dlp
+    except ImportError as error:
+        raise RuntimeError("yt-dlp is not installed. Run: pip install -r requirements.txt") from error
+
+    try:
+        import imageio_ffmpeg
+        ffmpeg_location = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        ffmpeg_location = None
+
+    clear_existing_downloads(output_template)
+
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": output_template,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 30,
+        "retries": 3,
+        "fragment_retries": 3,
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
+    }
+
+    if ffmpeg_location:
+        ydl_opts["ffmpeg_location"] = ffmpeg_location
+
+    if progress_hook:
+        ydl_opts["progress_hooks"] = [progress_hook]
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+
+    if not info:
+        raise RuntimeError("No audio information was returned.")
+
+    base_path_without_ext = os.path.splitext(output_template)[0]
+    expected_mp3_path = f"{base_path_without_ext}.mp3"
+    if os.path.exists(expected_mp3_path):
+        return info, expected_mp3_path
+    
+    raise RuntimeError("Downloaded audio file was not found.")
+
+@app.get("/api/downloads")
+def get_downloads():
+    return load_downloads()
+
+@app.post("/api/downloads")
+def create_download(body: MediaDownloadRequest, request: Request):
+    import queue
+    import threading
+    from fastapi.responses import StreamingResponse
+
+    q = queue.Queue()
+
+    def progress_hook(d):
+        if d['status'] == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+            downloaded = d.get('downloaded_bytes') or 0
+            if total > 0:
+                percent = round((downloaded / total) * 100, 1)
+            else:
+                percent = 0.0
+            q.put({"status": "downloading", "percent": percent})
+        elif d['status'] == 'finished':
+            q.put({"status": "processing", "percent": 99.0})
+
+    def worker():
+        try:
+            import uuid
+            url = validate_http_url(body.url)
+            video_id = safe_video_id(url)
+            
+            if body.format == "mp3":
+                output_template = os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s")
+                info, file_path = download_audio_file(url, DOWNLOAD_DIR, output_template, progress_hook=progress_hook)
+                filename = os.path.basename(file_path)
+                thumbnail_url = info.get("thumbnail") or ""
+            else:
+                output_template = os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s")
+                info, file_path = download_video_file(url, DOWNLOAD_DIR, output_template, progress_hook=progress_hook)
+                filename = os.path.basename(file_path)
+                
+                try:
+                    thumbnail_filenames = generate_video_thumbnails(file_path)
+                    if thumbnail_filenames:
+                        thumbnail_url = f"{str(request.base_url).rstrip('/')}/thumbnails/{quote(thumbnail_filenames[0])}"
+                    else:
+                        thumbnail_url = info.get("thumbnail") or ""
+                except Exception:
+                    thumbnail_url = info.get("thumbnail") or ""
+
+            # Copy to custom folder if specified and valid
+            saved_path = ""
+            if body.save_folder:
+                folder = os.path.expanduser(body.save_folder.strip())
+                if folder:
+                    try:
+                        os.makedirs(folder, exist_ok=True)
+                        dest_path = os.path.join(folder, filename)
+                        shutil.copy2(file_path, dest_path)
+                        saved_path = dest_path
+                    except Exception as e:
+                        print(f"Failed to copy download file to custom folder: {e}")
+
+            downloads = load_downloads()
+            downloads = [d for d in downloads if not (d.get("url") == url and d.get("format") == body.format)]
+            
+            download_id = str(uuid.uuid4())
+            new_download = {
+                "id": download_id,
+                "title": info.get("title") or filename,
+                "url": url,
+                "format": body.format,
+                "filename": filename,
+                "file_url": build_public_url(request, filename),
+                "thumbnail_url": thumbnail_url,
+                "duration": info.get("duration"),
+                "created_at": datetime.now().isoformat(),
+                "saved_path": saved_path
+            }
+            
+            downloads.insert(0, new_download)
+            save_downloads(downloads)
+            
+            q.put({"status": "success", "percent": 100.0, "download": new_download})
+        except Exception as e:
+            q.put({"status": "error", "message": str(e)})
+
+    # Start the worker thread
+    t = threading.Thread(target=worker)
+    t.daemon = True
+    t.start()
+
+    def generate():
+        while True:
+            try:
+                # Poll queue with timeout to release thread if client disconnects
+                msg = q.get(timeout=60.0)
+                yield json.dumps(msg) + "\n"
+                if msg.get("status") in ("success", "error"):
+                    break
+            except queue.Empty:
+                yield json.dumps({"status": "error", "message": "Download timeout (no activity for 60s)"}) + "\n"
+                break
+            except Exception as ex:
+                yield json.dumps({"status": "error", "message": str(ex)}) + "\n"
+                break
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+@app.post("/api/open-folder")
+def open_folder(body: FilePathRequest):
+    import os
+    import subprocess
+    import platform
+    
+    path = body.file_path.strip()
+    if not path:
+        return {"success": False, "error": "Path is empty"}
+        
+    expanded_path = os.path.expanduser(path)
+    if not os.path.isabs(expanded_path):
+        expanded_path = os.path.join(DOWNLOAD_DIR, expanded_path)
+    try:
+        if os.path.exists(expanded_path):
+            if platform.system() == "Windows":
+                if os.path.isfile(expanded_path):
+                    subprocess.run(["explorer", "/select,", os.path.normpath(expanded_path)], check=True)
+                else:
+                    os.startfile(os.path.normpath(expanded_path))
+            else:
+                if os.path.isfile(expanded_path):
+                    parent = os.path.dirname(expanded_path)
+                else:
+                    parent = expanded_path
+                if platform.system() == "Darwin":
+                    subprocess.run(["open", parent], check=True)
+                else:
+                    subprocess.run(["xdg-open", parent], check=True)
+            return {"success": True}
+        else:
+            return {"success": False, "error": f"Path does not exist: {expanded_path}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.delete("/api/downloads/{download_id}")
+def delete_download(download_id: str):
+    downloads = load_downloads()
+    dl_index = next((i for i, d in enumerate(downloads) if d.get("id") == download_id), -1)
+    if dl_index == -1:
+        raise HTTPException(status_code=404, detail="Download not found")
+        
+    download = downloads.pop(dl_index)
+    file_path = os.path.join(DOWNLOAD_DIR, download.get("filename"))
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+            
+    save_downloads(downloads)
+    return {"success": True}
+
+@app.post("/api/choose-folder")
+def choose_folder():
+    import tkinter as tk
+    from tkinter import filedialog
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        folder = filedialog.askdirectory(title="Select Folder to Store Videos")
+        root.destroy()
+        return {"success": True, "folder": folder}
+    except Exception as e:
+        return {"success": False, "error": str(e), "folder": ""}
 
 @app.get("/")
 def root():
@@ -323,3 +1043,4 @@ def root():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
