@@ -19,6 +19,9 @@ export default function PEPost() {
   const [fbStatus, setFbStatus] = useState({ connected: false, user_name: '', user_id: '', pages: [] });
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [fbAccessTokenInput, setFbAccessTokenInput] = useState('');
+  const [fbAppId, setFbAppId] = useState('');
+  const [fbAppSecret, setFbAppSecret] = useState('');
+  const [connectTab, setConnectTab] = useState('oauth');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
   const [captionSource, setCaptionSource] = useState('manual');
   const [ctaAction, setCtaAction] = useState('');
@@ -121,15 +124,96 @@ export default function PEPost() {
       if (response.ok) {
         const data = await response.json();
         setFbStatus(data);
+        if (data.app_id) {
+          setFbAppId(data.app_id);
+        }
+        if (data.app_secret_set) {
+          setFbAppSecret('••••••••••••••••');
+        } else {
+          setFbAppSecret('');
+        }
         if (data.connected) {
           setFacebookAccount(data.user_name);
           if (data.pages && data.pages.length > 0) {
-            setFacebookPage(data.pages[0].id);
+            setFacebookPage(prev => {
+              const exists = data.pages.some(p => String(p.id) === String(prev));
+              return exists ? prev : data.pages[0].id;
+            });
           }
         }
       }
     } catch (e) {
       console.error("Error fetching FB status:", e);
+    }
+  };
+
+  const startFbOauthFlow = async () => {
+    // Empty App ID/Secret defaults to Simulated/Sandbox Login on the backend
+    setIsConnectingFb(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/fb/start_oauth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: fbAppId,
+          appSecret: fbAppSecret === '••••••••••••••••' ? '' : fbAppSecret
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        const width = 600;
+        const height = 700;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        const oauthWindow = window.open(
+          data.oauth_url,
+          'Facebook Login',
+          `width=${width},height=${height},top=${top},left=${left}`
+        );
+
+        // Poll API status every 2 seconds
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await fetch(`${API_BASE_URL}/api/fb/status`);
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              if (statusData.connected) {
+                clearInterval(pollInterval);
+                setFbStatus(statusData);
+                setFacebookAccount(statusData.user_name);
+                if (statusData.pages && statusData.pages.length > 0) {
+                  setFacebookPage(statusData.pages[0].id);
+                }
+                setShowConnectModal(false);
+                setIsConnectingFb(false);
+                alert("Facebook Account connected successfully!");
+                if (oauthWindow && !oauthWindow.closed) {
+                  oauthWindow.close();
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Polling status error:", err);
+          }
+        }, 2000);
+
+        // Check if window closed without completing
+        const checkClosed = setInterval(() => {
+          if (oauthWindow && oauthWindow.closed) {
+            clearInterval(checkClosed);
+            clearInterval(pollInterval);
+            setIsConnectingFb(false);
+            // Final check
+            fetchFbStatus();
+          }
+        }, 1000);
+      } else {
+        alert(data.detail || "Failed to initiate OAuth flow");
+        setIsConnectingFb(false);
+      }
+    } catch (e) {
+      alert("Error: " + e.message);
+      setIsConnectingFb(false);
     }
   };
 
@@ -950,34 +1034,122 @@ export default function PEPost() {
       {/* Facebook Access Token Connection Modal */}
       {showConnectModal && (
         <div className="pe-modal-overlay">
-          <div className="pe-modal-box">
+          <div className="pe-modal-box" style={{ width: '550px' }}>
             <div className="pe-modal-header">
               <h2>Connect Facebook Account</h2>
               <button type="button" className="close-modal-btn" onClick={() => setShowConnectModal(false)}>✕</button>
             </div>
+            
             <div className="pe-modal-body">
-              <p className="pe-modal-desc">
-                Paste a <strong>Facebook Graph User Access Token</strong> to link your profile. 
-                The token must have permissions like <code>pages_show_list</code>, <code>pages_read_engagement</code>, and <code>pages_manage_posts</code>.
-              </p>
-              
-              <div className="input-group">
-                <label>Facebook Access Token:</label>
-                <textarea
-                  value={fbAccessTokenInput}
-                  onChange={(e) => setFbAccessTokenInput(e.target.value)}
-                  placeholder="Paste Facebook EAAG... Token here"
-                  rows="4"
-                  className="token-textarea"
-                />
+              {/* Tab Selector */}
+              <div className="modal-tabs">
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${connectTab === 'oauth' ? 'active' : ''}`}
+                  onClick={() => setConnectTab('oauth')}
+                >
+                  🔑 Official Login (OAuth)
+                </button>
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${connectTab === 'token' ? 'active' : ''}`}
+                  onClick={() => setConnectTab('token')}
+                >
+                  📝 Manual Access Token
+                </button>
               </div>
 
-              <div className="dev-links">
-                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
-                  ↗ Open Facebook Graph API Explorer
-                </a>
-              </div>
+              {connectTab === 'oauth' ? (
+                <>
+                  <p className="pe-modal-desc">
+                    Connect your Facebook profile and pages securely using OAuth 2.0 via your Facebook Developer App.
+                  </p>
+
+                  <div className="input-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App ID (Optional for Sandbox):</label>
+                        <input
+                          type="text"
+                          value={fbAppId}
+                          onChange={(e) => setFbAppId(e.target.value)}
+                          placeholder="Leave empty for Demo Mode"
+                          className="modal-input-field"
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App Secret (Optional):</label>
+                        <input
+                          type="password"
+                          value={fbAppSecret}
+                          onChange={(e) => setFbAppSecret(e.target.value)}
+                          placeholder="Leave empty for Demo Mode"
+                          className="modal-input-field"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="whitelist-card">
+                    <div className="whitelist-header">
+                      <span className="whitelist-label">OAuth Redirect URI</span>
+                      <button
+                        type="button"
+                        className="whitelist-copy-btn"
+                        onClick={() => {
+                          const uri = `${API_BASE_URL}/api/fb/callback`;
+                          navigator.clipboard.writeText(uri);
+                          alert("Redirect URI copied to clipboard!");
+                        }}
+                      >
+                        📋 Copy URI
+                      </button>
+                    </div>
+                    <p className="pe-modal-desc" style={{ fontSize: '0.8rem', color: '#93c5fd', margin: '2px 0' }}>
+                      Add this exact URI to your Facebook Developer App under <strong>Facebook Login &gt; Settings &gt; Valid OAuth Redirect URIs</strong>:
+                    </p>
+                    <div className="whitelist-uri-box">
+                      {`${API_BASE_URL}/api/fb/callback`}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="modal-btn modal-btn--connect-oauth"
+                    onClick={startFbOauthFlow}
+                    disabled={isConnectingFb}
+                    style={{ marginTop: '10px', padding: '12px' }}
+                  >
+                    {isConnectingFb ? 'Connecting via Facebook...' : '🔵 Login & Authorize with Facebook'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="pe-modal-desc">
+                    Paste a <strong>Facebook Graph User Access Token</strong> directly to link your profile. 
+                    The token must have permissions: <code>pages_show_list</code>, <code>pages_read_engagement</code>, and <code>pages_manage_posts</code>.
+                  </p>
+                  
+                  <div className="input-group">
+                    <label>Facebook Access Token:</label>
+                    <textarea
+                      value={fbAccessTokenInput}
+                      onChange={(e) => setFbAccessTokenInput(e.target.value)}
+                      placeholder="Paste Facebook EAAG... Token here"
+                      rows="4"
+                      className="token-textarea"
+                    />
+                  </div>
+
+                  <div className="dev-links">
+                    <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
+                      ↗ Open Facebook Graph API Explorer
+                    </a>
+                  </div>
+                </>
+              )}
             </div>
+            
             <div className="pe-modal-footer">
               <button
                 type="button"
@@ -999,14 +1171,16 @@ export default function PEPost() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="modal-btn modal-btn--connect"
-                  onClick={() => handleConnectFb()}
-                  disabled={isConnectingFb || !fbAccessTokenInput.trim()}
-                >
-                  {isConnectingFb ? 'Connecting...' : 'Connect'}
-                </button>
+                {connectTab === 'token' && (
+                  <button
+                    type="button"
+                    className="modal-btn modal-btn--connect"
+                    onClick={() => handleConnectFb()}
+                    disabled={isConnectingFb || !fbAccessTokenInput.trim()}
+                  >
+                    {isConnectingFb ? 'Connecting...' : 'Connect'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

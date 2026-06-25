@@ -400,6 +400,24 @@
     padding: 10px 16px;
   }
 
+  .navbar {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+
+  .navbar-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding: 4px 0 8px;
+  }
+
+  .navbar-item {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+  }
+
   .brand-text h1 {
     font-size: 1.15rem;
   }
@@ -424,11 +442,6 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-  }
-
-  .navbar-item {
-    padding: 7px 14px;
-    font-size: 0.85rem;
   }
 }
 
