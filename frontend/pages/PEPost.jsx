@@ -23,6 +23,7 @@ export default function PEPost() {
   const [fbAppSecret, setFbAppSecret] = useState('');
   const [connectTab, setConnectTab] = useState('oauth');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [captionSource, setCaptionSource] = useState('manual');
   const [ctaAction, setCtaAction] = useState('');
   const [ctaText, setCtaText] = useState('Support page Share & Follow');
@@ -1041,110 +1042,171 @@ export default function PEPost() {
             </div>
             
             <div className="pe-modal-body">
-              {/* Tab Selector */}
-              <div className="modal-tabs">
-                <button
-                  type="button"
-                  className={`modal-tab-btn ${connectTab === 'oauth' ? 'active' : ''}`}
-                  onClick={() => setConnectTab('oauth')}
-                >
-                  🔑 Official Login (OAuth)
-                </button>
-                <button
-                  type="button"
-                  className={`modal-tab-btn ${connectTab === 'token' ? 'active' : ''}`}
-                  onClick={() => setConnectTab('token')}
-                >
-                  📝 Manual Access Token
-                </button>
-              </div>
-
-              {connectTab === 'oauth' ? (
-                <>
-                  <p className="pe-modal-desc">
-                    Connect your Facebook profile and pages securely using OAuth 2.0 via your Facebook Developer App.
+              {!showAdvancedSettings ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center', padding: '10px 0' }}>
+                  <p className="pe-modal-desc" style={{ fontSize: '0.95rem', lineHeight: '1.5', color: '#cbd5e1' }}>
+                    Click the button below to log in and link your Facebook account. 
+                    This will automatically discover and load all the Pages you manage.
                   </p>
-
-                  <div className="input-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App ID (Optional for Sandbox):</label>
-                        <input
-                          type="text"
-                          value={fbAppId}
-                          onChange={(e) => setFbAppId(e.target.value)}
-                          placeholder="Leave empty for Demo Mode"
-                          className="modal-input-field"
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App Secret (Optional):</label>
-                        <input
-                          type="password"
-                          value={fbAppSecret}
-                          onChange={(e) => setFbAppSecret(e.target.value)}
-                          placeholder="Leave empty for Demo Mode"
-                          className="modal-input-field"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="whitelist-card">
-                    <div className="whitelist-header">
-                      <span className="whitelist-label">OAuth Redirect URI</span>
-                      <button
-                        type="button"
-                        className="whitelist-copy-btn"
-                        onClick={() => {
-                          const uri = `${API_BASE_URL}/api/fb/callback`;
-                          navigator.clipboard.writeText(uri);
-                          alert("Redirect URI copied to clipboard!");
-                        }}
-                      >
-                        📋 Copy URI
-                      </button>
-                    </div>
-                    <p className="pe-modal-desc" style={{ fontSize: '0.8rem', color: '#93c5fd', margin: '2px 0' }}>
-                      Add this exact URI to your Facebook Developer App under <strong>Facebook Login &gt; Settings &gt; Valid OAuth Redirect URIs</strong>:
-                    </p>
-                    <div className="whitelist-uri-box">
-                      {`${API_BASE_URL}/api/fb/callback`}
-                    </div>
-                  </div>
 
                   <button
                     type="button"
                     className="modal-btn modal-btn--connect-oauth"
                     onClick={startFbOauthFlow}
                     disabled={isConnectingFb}
-                    style={{ marginTop: '10px', padding: '12px' }}
+                    style={{ 
+                      padding: '14px', 
+                      fontSize: '1rem', 
+                      background: 'linear-gradient(135deg, #1877f2, #3b82f6)',
+                      boxShadow: '0 4px 15px rgba(24, 119, 242, 0.25)',
+                      borderRadius: '12px'
+                    }}
                   >
-                    {isConnectingFb ? 'Connecting via Facebook...' : '🔵 Login & Authorize with Facebook'}
+                    {isConnectingFb ? 'Connecting via Facebook...' : '🔵 Log In with Facebook'}
                   </button>
-                </>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedSettings(true)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#60a5fa',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      marginTop: '8px',
+                      display: 'inline-block'
+                    }}
+                  >
+                    ⚙️ Show Advanced Developer Settings
+                  </button>
+                </div>
               ) : (
                 <>
-                  <p className="pe-modal-desc">
-                    Paste a <strong>Facebook Graph User Access Token</strong> directly to link your profile. 
-                    The token must have permissions: <code>pages_show_list</code>, <code>pages_read_engagement</code>, and <code>pages_manage_posts</code>.
-                  </p>
-                  
-                  <div className="input-group">
-                    <label>Facebook Access Token:</label>
-                    <textarea
-                      value={fbAccessTokenInput}
-                      onChange={(e) => setFbAccessTokenInput(e.target.value)}
-                      placeholder="Paste Facebook EAAG... Token here"
-                      rows="4"
-                      className="token-textarea"
-                    />
+                  {/* Tab Selector */}
+                  <div className="modal-tabs">
+                    <button
+                      type="button"
+                      className={`modal-tab-btn ${connectTab === 'oauth' ? 'active' : ''}`}
+                      onClick={() => setConnectTab('oauth')}
+                    >
+                      🔑 Official Login (OAuth)
+                    </button>
+                    <button
+                      type="button"
+                      className={`modal-tab-btn ${connectTab === 'token' ? 'active' : ''}`}
+                      onClick={() => setConnectTab('token')}
+                    >
+                      📝 Manual Access Token
+                    </button>
                   </div>
 
-                  <div className="dev-links">
-                    <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
-                      ↗ Open Facebook Graph API Explorer
-                    </a>
+                  {connectTab === 'oauth' ? (
+                    <>
+                      <p className="pe-modal-desc">
+                        Connect your Facebook profile and pages securely using OAuth 2.0 via your Facebook Developer App.
+                      </p>
+
+                      <div className="input-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App ID (Optional for Sandbox):</label>
+                            <input
+                              type="text"
+                              value={fbAppId}
+                              onChange={(e) => setFbAppId(e.target.value)}
+                              placeholder="Leave empty for Demo Mode"
+                              className="modal-input-field"
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.82rem', marginBottom: '4px', display: 'block' }}>Facebook App Secret (Optional):</label>
+                            <input
+                              type="password"
+                              value={fbAppSecret}
+                              onChange={(e) => setFbAppSecret(e.target.value)}
+                              placeholder="Leave empty for Demo Mode"
+                              className="modal-input-field"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="whitelist-card">
+                        <div className="whitelist-header">
+                          <span className="whitelist-label">OAuth Redirect URI</span>
+                          <button
+                            type="button"
+                            className="whitelist-copy-btn"
+                            onClick={() => {
+                              const uri = `${API_BASE_URL}/api/fb/callback`;
+                              navigator.clipboard.writeText(uri);
+                              alert("Redirect URI copied to clipboard!");
+                            }}
+                          >
+                            📋 Copy URI
+                          </button>
+                        </div>
+                        <p className="pe-modal-desc" style={{ fontSize: '0.8rem', color: '#93c5fd', margin: '2px 0' }}>
+                          Add this exact URI to your Facebook Developer App under <strong>Facebook Login &gt; Settings &gt; Valid OAuth Redirect URIs</strong>:
+                        </p>
+                        <div className="whitelist-uri-box">
+                          {`${API_BASE_URL}/api/fb/callback`}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="modal-btn modal-btn--connect-oauth"
+                        onClick={startFbOauthFlow}
+                        disabled={isConnectingFb}
+                        style={{ marginTop: '10px', padding: '12px' }}
+                      >
+                        {isConnectingFb ? 'Connecting via Facebook...' : '🔵 Login & Authorize with Facebook'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="pe-modal-desc">
+                        Paste a <strong>Facebook Graph User Access Token</strong> directly to link your profile. 
+                        The token must have permissions: <code>pages_show_list</code>, <code>pages_read_engagement</code>, and <code>pages_manage_posts</code>.
+                      </p>
+                      
+                      <div className="input-group">
+                        <label>Facebook Access Token:</label>
+                        <textarea
+                          value={fbAccessTokenInput}
+                          onChange={(e) => setFbAccessTokenInput(e.target.value)}
+                          placeholder="Paste Facebook EAAG... Token here"
+                          rows="4"
+                          className="token-textarea"
+                        />
+                      </div>
+
+                      <div className="dev-links">
+                        <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
+                          ↗ Open Facebook Graph API Explorer
+                        </a>
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedSettings(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      ⚙️ Hide Advanced Settings (Back to Simple Mode)
+                    </button>
                   </div>
                 </>
               )}
